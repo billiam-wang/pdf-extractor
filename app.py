@@ -114,7 +114,7 @@ Please provide a clear, organized summary of the technical specifications:"""
         return f"Error extracting specifications with {provider}: {str(e)}\n{traceback.format_exc()}"
 
 
-def extract_images_from_pdf(file_path: str, output_dir: Optional[str] = None) -> List[dict]:
+def extract_images_from_pdf(file_path: str, output_dir: Optional[str] = None):
     """
     Extract all images/diagrams from a PDF file.
 
@@ -187,7 +187,7 @@ def extract_images_from_pdf(file_path: str, output_dir: Optional[str] = None) ->
     return images
 
 
-def extract_pdf_info(file_path: str, llm_provider: Optional[str] = None) -> dict:
+def extract_pdf_info(file_path: str, llm_provider: Optional[str] = None):
     """
     Extract specifications and diagrams from a single PDF file.
 
