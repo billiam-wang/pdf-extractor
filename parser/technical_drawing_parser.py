@@ -13,7 +13,6 @@ import io
 import traceback
 from PIL import Image
 from pathlib import Path
-import anthropic
 import openai
 
 
@@ -25,16 +24,14 @@ class TechnicalDrawingParser:
         Initialize the technical drawing parser.
 
         Args:
-            llm_provider: LLM provider to use (anthropic, openai, databricks)
+            llm_provider: LLM provider to use (databricks)
         """
         self.llm_provider = llm_provider or os.getenv("LLM_PROVIDER", "databricks")
-        self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "")
-        self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
 
         # Databricks configuration
-        self.databricks_host = os.getenv("DATABRICKS_HOST", "")
+        self.databricks_host = "https://dbc-101acd43-457b.cloud.databricks.com"
         self.databricks_token = os.getenv("DATABRICKS_TOKEN", "")
-        self.databricks_endpoint = os.getenv("DATABRICKS_SERVING_ENDPOINT", "")
+        self.model_name = "databricks-gpt-5-2"
 
     def extract_specifications_with_llm(self, text_content):
         """
@@ -68,118 +65,32 @@ Document text:
 Please provide a clear, organized summary of the technical specifications:"""
 
         try:
-            if self.llm_provider == "anthropic":
-                if not self.anthropic_api_key:
-                    return "Error: ANTHROPIC_API_KEY not set. Please configure your API key."
+            # Use OpenAI client with Databricks endpoint
+            client = openai.OpenAI(
+                base_url=f"{self.databricks_host}/serving-endpoints/{self.model_name}/invocations",
+                api_key=self.databricks_token or "dummy-key"  # Token may not be needed in Databricks Apps
+            )
 
-                client = anthropic.Anthropic(api_key=self.anthropic_api_key)
-                message = client.messages.create(
-                    model="claude-3-5-sonnet-20241022",
-                    max_tokens=2048,
-                    messages=[
-                        {"role": "user", "content": prompt}
-                    ]
-                )
-                return message.content[0].text
+            response = client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a technical document analyzer specializing in extracting specifications."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=2048,
+                temperature=0.1
+            )
 
-            elif self.llm_provider == "openai":
-                if not self.openai_api_key:
-                    return "Error: OPENAI_API_KEY not set. Please configure your API key."
-
-                client = openai.OpenAI(api_key=self.openai_api_key)
-                response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {"role": "system", "content": "You are a technical document analyzer specializing in extracting specifications."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    max_tokens=2048
-                )
-                return response.choices[0].message.content
-
-            elif self.llm_provider == "databricks":
-                return self._call_databricks_endpoint(prompt)
-
-            else:
-                return f"Error: Unknown LLM provider '{self.llm_provider}'. Supported: anthropic, openai, databricks"
+            return response.choices[0].message.content
 
         except Exception as e:
-            return f"Error extracting specifications with {self.llm_provider}: {str(e)}\n{traceback.format_exc()}"
-
-    def _call_databricks_endpoint(self, prompt):
-        """
-        Call Databricks model serving endpoint.
-
-        Supports both:
-        1. Databricks Apps (automatic workspace authentication)
-        2. External calls (using DATABRICKS_HOST and DATABRICKS_TOKEN)
-        """
-        import requests
-
-        # Determine endpoint URL
-        if self.databricks_endpoint:
-            # Full endpoint URL provided
-            endpoint_url = self.databricks_endpoint
-        elif self.databricks_host:
-            # Build URL from host - you'll need to set the serving endpoint name
-            endpoint_name = os.getenv("DATABRICKS_ENDPOINT_NAME", "")
-            if not endpoint_name:
-                return "Error: DATABRICKS_ENDPOINT_NAME not set. Please set the serving endpoint name."
-            endpoint_url = f"{self.databricks_host}/serving-endpoints/{endpoint_name}/invocations"
-        else:
-            return "Error: DATABRICKS_HOST or DATABRICKS_SERVING_ENDPOINT must be set."
-
-        # Set up authentication
-        headers = {
-            "Content-Type": "application/json"
-        }
-
-        # Add token if available (for external calls)
-        # When running in Databricks Apps, workspace auth is automatic
-        if self.databricks_token:
-            headers["Authorization"] = f"Bearer {self.databricks_token}"
-
-        # Prepare request payload
-        # Adjust this based on your model's expected format
-        data = {
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are a technical document analyzer specializing in extracting specifications."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            "max_tokens": 2048,
-            "temperature": 0.1
-        }
-
-        try:
-            response = requests.post(endpoint_url, headers=headers, json=data, timeout=60)
-            response.raise_for_status()
-            result = response.json()
-
-            # Extract response - adjust based on your model's response format
-            # Common formats:
-            if "choices" in result:
-                # OpenAI-compatible format
-                return result["choices"][0]["message"]["content"]
-            elif "predictions" in result:
-                # Databricks MLflow format
-                return result["predictions"][0]
-            elif "content" in result:
-                # Direct content format
-                return result["content"]
-            else:
-                # Return full response if format unknown
-                return str(result)
-
-        except requests.exceptions.RequestException as e:
-            return f"Error calling Databricks endpoint: {str(e)}\nURL: {endpoint_url}"
-        except Exception as e:
-            return f"Error processing Databricks response: {str(e)}"
+            return f"Error extracting specifications: {str(e)}\n{traceback.format_exc()}"
 
     def extract_images_from_pdf(self, file_path, output_dir=None):
         """
