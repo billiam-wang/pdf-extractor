@@ -135,11 +135,10 @@ def create_interface():
                     type="filepath"
                 )
 
-                llm_provider = gr.Dropdown(
-                    choices=["anthropic", "openai", "databricks"],
-                    value=default_llm_provider,
-                    label="LLM Provider",
-                    info="Choose the AI model provider for specification extraction"
+                # LLM provider is hardcoded to databricks
+                llm_provider = gr.Textbox(
+                    value="databricks",
+                    visible=False
                 )
 
                 max_workers = gr.Slider(
