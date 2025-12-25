@@ -37,6 +37,13 @@ env/
 gradio_cached_examples/
 flagged/
 
+# Environment variables
+.env
+.env.local
+
+# Extracted images
+extracted_images/
+
 # OS
 .DS_Store
 Thumbs.db
