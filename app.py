@@ -6,54 +6,14 @@ import os
 from parser import TechnicalDrawingParser
 
 
-def process_pdfs_parallel(files, max_workers=4, llm_provider=None):
-    """
-    Process multiple PDF files in parallel.
-
-    Args:
-        files: List of file paths
-        max_workers: Number of parallel workers
-        llm_provider: LLM provider to use (anthropic/openai/databricks)
-
-    Returns:
-        Tuple of (summary_text, detailed_json, diagram_paths)
-    """
-    if not files:
-        return "No files uploaded.", "{}", []
-
-    results = []
-    all_diagrams = []
-
-    # Initialize parser (technical drawing parser is the default)
+def parse_single_pdf(file_path, llm_provider):
+    """Parse a single PDF file."""
     parser = TechnicalDrawingParser(llm_provider=llm_provider)
+    return parser.parse(file_path)
 
-    # Process files in parallel
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Submit all tasks
-        future_to_file = {executor.submit(parser.parse, file): file for file in files}
 
-        # Collect results as they complete
-        for future in as_completed(future_to_file):
-            file_path = future_to_file[future]
-            try:
-                result = future.result()
-                results.append(result)
-
-                # Collect all diagram paths
-                for diagram in result.get("diagrams", []):
-                    all_diagrams.append(diagram["path"])
-
-            except Exception as e:
-                results.append({
-                    "filename": os.path.basename(file_path),
-                    "status": "error",
-                    "error": f"Processing failed: {str(e)}",
-                    "specifications": "",
-                    "diagrams": [],
-                    "page_count": 0
-                })
-
-    # Generate summary
+def format_results(results):
+    """Format results into summary text and JSON."""
     summary_parts = [f"Processed {len(results)} file(s):\n"]
     success_count = sum(1 for r in results if r["status"] == "success")
     error_count = len(results) - success_count
@@ -89,13 +49,55 @@ def process_pdfs_parallel(files, max_workers=4, llm_provider=None):
     summary_text = "\n".join(summary_parts)
     detailed_json = json.dumps(results, indent=2, ensure_ascii=False, default=str)
 
+    return summary_text, detailed_json
+
+
+def process_files(files, max_workers, llm_provider):
+    """Process multiple PDF files and return results."""
+    if not files:
+        return "No files uploaded.", "{}", []
+
+    results = []
+    all_diagrams = []
+
+    # Process files in parallel using ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
+        futures = {
+            executor.submit(parse_single_pdf, file, llm_provider): file
+            for file in files
+        }
+
+        # Collect results as they complete
+        for future in as_completed(futures):
+            file_path = futures[future]
+            try:
+                result = future.result()
+                results.append(result)
+
+                # Collect diagram paths
+                for diagram in result.get("diagrams", []):
+                    all_diagrams.append(diagram["path"])
+
+            except Exception as e:
+                results.append({
+                    "filename": os.path.basename(file_path),
+                    "status": "error",
+                    "error": f"Processing failed: {str(e)}",
+                    "specifications": "",
+                    "diagrams": [],
+                    "page_count": 0
+                })
+
+    # Format results
+    summary_text, detailed_json = format_results(results)
+
     return summary_text, detailed_json, all_diagrams
 
 
 def create_interface():
     """Create the Gradio interface."""
 
-    # Get default LLM provider from environment
     default_llm_provider = os.getenv("LLM_PROVIDER", "anthropic")
 
     with gr.Blocks(title="PDF Technical Specification & Diagram Extractor", theme=gr.themes.Soft()) as demo:
@@ -171,15 +173,12 @@ def create_interface():
             """
             ---
             ### 🎯 How to use:
-            1. **Configure LLM**: Set your API key as environment variable (ANTHROPIC_API_KEY, OPENAI_API_KEY, or DATABRICKS credentials)
+            1. **Configure LLM**: Set your API key as environment variable
             2. **Upload PDFs**: Click or drag-and-drop one or more technical PDF files
             3. **Select Provider**: Choose your preferred AI model provider
             4. **Adjust Workers**: Set parallel processing level (default: 4)
             5. **Extract**: Click the extract button and wait for processing
-            6. **Review Results**:
-               - **Specifications Summary**: AI-extracted technical specs
-               - **Extracted Diagrams**: Visual gallery of all diagrams
-               - **Detailed JSON**: Complete structured data
+            6. **Review Results**: Check the three tabs for different views of the data
 
             ### 🔑 Environment Variables:
             ```bash
@@ -198,9 +197,9 @@ def create_interface():
             """
         )
 
-        # Wire up the event handler
+        # Wire up the event handler - single simple function call
         process_btn.click(
-            fn=process_pdfs_parallel,
+            fn=process_files,
             inputs=[file_input, max_workers, llm_provider],
             outputs=[summary_output, json_output, diagram_gallery]
         )
