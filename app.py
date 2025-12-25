@@ -1,7 +1,7 @@
 import gradio as gr
 import fitz  # PyMuPDF
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Any
 import json
 import traceback
 import os
@@ -239,7 +239,7 @@ def extract_pdf_info(file_path: str, llm_provider: Optional[str] = None) -> dict
     return result
 
 
-def process_pdfs_parallel(files: List[str], max_workers: int = 4, llm_provider: Optional[str] = None) -> Tuple[str, str, List[str]]:
+def process_pdfs_parallel(files, max_workers: int = 4, llm_provider: Optional[str] = None):
     """
     Process multiple PDF files in parallel.
 
