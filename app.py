@@ -7,19 +7,23 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def parse_single_pdf(file_path, llm_provider):
-    """Parse a single PDF file. Returns dict internally."""
+    """Parse a single PDF file."""
     parser = TechnicalDrawingParser(llm_provider=llm_provider)
     return parser.parse(file_path)
 
 
-def process_all_pdfs(files, max_workers, llm_provider):
+def run_extraction_pipeline(files, max_workers, llm_provider):
     """
-    Core processing logic - handles all dict operations.
-    This function is NOT connected to Gradio.
+    Complete extraction pipeline that returns only simple types.
+    All dict operations happen inside this function.
+    Returns: (summary_str, json_str, paths_list)
     """
-    results = []
+    # Handle empty input
+    if not files:
+        return "No files uploaded.", "{}", []
 
-    # Process files in parallel
+    # Process all files in parallel
+    results = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
             executor.submit(parse_single_pdf, file, llm_provider): file
@@ -41,11 +45,7 @@ def process_all_pdfs(files, max_workers, llm_provider):
                     "page_count": 0
                 })
 
-    return results
-
-
-def format_summary(results):
-    """Build summary text from results."""
+    # Build summary text
     lines = []
     success = sum(1 for r in results if r.get("status") == "success")
     errors = len(results) - success
@@ -81,40 +81,29 @@ def format_summary(results):
         else:
             lines.append(f"Error: {result.get('error', 'Unknown error')}")
 
-    return "\n".join(lines)
+    summary_text = "\n".join(lines)
 
+    # Convert to JSON string
+    json_text = json.dumps(results, indent=2, ensure_ascii=False, default=str)
 
-def extract_diagram_paths(results):
-    """Extract all diagram paths from results."""
+    # Extract diagram paths
     paths = []
     for result in results:
         for diagram in result.get("diagrams", []):
             path = diagram.get("path")
             if path:
                 paths.append(path)
-    return paths
+
+    # Return only simple types
+    return summary_text, json_text, paths
 
 
 def process_files(files, max_workers, llm_provider):
     """
-    Gradio-connected wrapper function.
-    Only handles simple types - strings and lists of strings.
-    All dict operations happen in other functions.
+    Gradio wrapper - calls pipeline and returns result.
+    NO operations, NO variables, just pass through.
     """
-    # Handle empty input
-    if not files:
-        return "No files uploaded.", "{}", []
-
-    # Process files - returns list of dicts (happens outside this scope conceptually)
-    results = process_all_pdfs(files, max_workers, llm_provider)
-
-    # Convert to simple types for Gradio
-    summary_text = format_summary(results)
-    json_text = json.dumps(results, indent=2, ensure_ascii=False, default=str)
-    diagram_paths = extract_diagram_paths(results)
-
-    # Return only strings and list of strings
-    return summary_text, json_text, diagram_paths
+    return run_extraction_pipeline(files, max_workers, llm_provider)
 
 
 def create_interface():
@@ -219,7 +208,7 @@ def create_interface():
             """
         )
 
-        # Connect the simple wrapper function
+        # Connect the minimal wrapper
         process_btn.click(
             fn=process_files,
             inputs=[file_input, max_workers, llm_provider],
