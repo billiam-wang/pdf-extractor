@@ -1,98 +1,120 @@
 import gradio as gr
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
 
 from parser import TechnicalDrawingParser
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def parse_single_pdf(file_path, llm_provider):
-    """Parse a single PDF file."""
+    """Parse a single PDF file. Returns dict internally."""
     parser = TechnicalDrawingParser(llm_provider=llm_provider)
     return parser.parse(file_path)
 
 
-def format_results(results):
-    """Format results into summary text and JSON."""
-    summary_parts = [f"Processed {len(results)} file(s):\n"]
-    success_count = sum(1 for r in results if r["status"] == "success")
-    error_count = len(results) - success_count
-    total_diagrams = sum(len(r.get("diagrams", [])) for r in results)
-
-    summary_parts.append(f"✅ Successful: {success_count}")
-    summary_parts.append(f"❌ Errors: {error_count}")
-    summary_parts.append(f"🖼️  Total diagrams extracted: {total_diagrams}\n")
-
-    for i, result in enumerate(results, 1):
-        summary_parts.append(f"\n{'='*80}")
-        summary_parts.append(f"File {i}: {result['filename']}")
-        summary_parts.append(f"Status: {result['status'].upper()}")
-
-        if result["status"] == "success":
-            summary_parts.append(f"Pages: {result['page_count']}")
-            summary_parts.append(f"Diagrams extracted: {len(result['diagrams'])}")
-
-            summary_parts.append("\n--- TECHNICAL SPECIFICATIONS ---")
-            summary_parts.append(result.get("specifications", "No specifications found"))
-
-            if result["diagrams"]:
-                summary_parts.append("\n--- EXTRACTED DIAGRAMS ---")
-                for diagram in result["diagrams"]:
-                    summary_parts.append(
-                        f"  • {diagram['filename']} - Page {diagram['page']}, "
-                        f"{diagram['width']}x{diagram['height']}px, "
-                        f"{diagram['size_bytes'] / 1024:.1f} KB"
-                    )
-        else:
-            summary_parts.append(f"Error: {result['error']}")
-
-    summary_text = "\n".join(summary_parts)
-    detailed_json = json.dumps(results, indent=2, ensure_ascii=False, default=str)
-
-    return summary_text, detailed_json
-
-
-def process_files(files, max_workers, llm_provider):
-    """Process multiple PDF files and return results."""
-    if not files:
-        return "No files uploaded.", "{}", []
-
+def process_all_pdfs(files, max_workers, llm_provider):
+    """
+    Core processing logic - handles all dict operations.
+    This function is NOT connected to Gradio.
+    """
     results = []
-    all_diagrams = []
 
-    # Process files in parallel using ThreadPoolExecutor
+    # Process files in parallel
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Submit all tasks
         futures = {
             executor.submit(parse_single_pdf, file, llm_provider): file
             for file in files
         }
 
-        # Collect results as they complete
         for future in as_completed(futures):
             file_path = futures[future]
             try:
                 result = future.result()
                 results.append(result)
-
-                # Collect diagram paths
-                for diagram in result.get("diagrams", []):
-                    all_diagrams.append(diagram["path"])
-
             except Exception as e:
                 results.append({
                     "filename": os.path.basename(file_path),
                     "status": "error",
-                    "error": f"Processing failed: {str(e)}",
+                    "error": str(e),
                     "specifications": "",
                     "diagrams": [],
                     "page_count": 0
                 })
 
-    # Format results
-    summary_text, detailed_json = format_results(results)
+    return results
 
-    return summary_text, detailed_json, all_diagrams
+
+def format_summary(results):
+    """Build summary text from results."""
+    lines = []
+    success = sum(1 for r in results if r.get("status") == "success")
+    errors = len(results) - success
+    total_diagrams = sum(len(r.get("diagrams", [])) for r in results)
+
+    lines.append(f"Processed {len(results)} file(s):\n")
+    lines.append(f"✅ Successful: {success}")
+    lines.append(f"❌ Errors: {errors}")
+    lines.append(f"🖼️  Total diagrams: {total_diagrams}\n")
+
+    for i, result in enumerate(results, 1):
+        lines.append(f"\n{'='*80}")
+        lines.append(f"File {i}: {result.get('filename', 'unknown')}")
+        lines.append(f"Status: {result.get('status', 'unknown').upper()}")
+
+        if result.get("status") == "success":
+            lines.append(f"Pages: {result.get('page_count', 0)}")
+            lines.append(f"Diagrams extracted: {len(result.get('diagrams', []))}")
+
+            lines.append("\n--- TECHNICAL SPECIFICATIONS ---")
+            lines.append(result.get("specifications", "No specifications found"))
+
+            diagrams = result.get("diagrams", [])
+            if diagrams:
+                lines.append("\n--- EXTRACTED DIAGRAMS ---")
+                for diag in diagrams:
+                    lines.append(
+                        f"  • {diag.get('filename', 'unknown')} - "
+                        f"Page {diag.get('page', '?')}, "
+                        f"{diag.get('width', 0)}x{diag.get('height', 0)}px, "
+                        f"{diag.get('size_bytes', 0) / 1024:.1f} KB"
+                    )
+        else:
+            lines.append(f"Error: {result.get('error', 'Unknown error')}")
+
+    return "\n".join(lines)
+
+
+def extract_diagram_paths(results):
+    """Extract all diagram paths from results."""
+    paths = []
+    for result in results:
+        for diagram in result.get("diagrams", []):
+            path = diagram.get("path")
+            if path:
+                paths.append(path)
+    return paths
+
+
+def process_files(files, max_workers, llm_provider):
+    """
+    Gradio-connected wrapper function.
+    Only handles simple types - strings and lists of strings.
+    All dict operations happen in other functions.
+    """
+    # Handle empty input
+    if not files:
+        return "No files uploaded.", "{}", []
+
+    # Process files - returns list of dicts (happens outside this scope conceptually)
+    results = process_all_pdfs(files, max_workers, llm_provider)
+
+    # Convert to simple types for Gradio
+    summary_text = format_summary(results)
+    json_text = json.dumps(results, indent=2, ensure_ascii=False, default=str)
+    diagram_paths = extract_diagram_paths(results)
+
+    # Return only strings and list of strings
+    return summary_text, json_text, diagram_paths
 
 
 def create_interface():
@@ -197,7 +219,7 @@ def create_interface():
             """
         )
 
-        # Wire up the event handler - single simple function call
+        # Connect the simple wrapper function
         process_btn.click(
             fn=process_files,
             inputs=[file_input, max_workers, llm_provider],
