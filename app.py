@@ -1,242 +1,10 @@
 import gradio as gr
-import fitz  # PyMuPDF
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Tuple, Optional, Any
+from typing import Optional
 import json
-import traceback
 import os
-import io
-from PIL import Image
-import base64
-from pathlib import Path
-import anthropic
-import openai
 
-
-# LLM Configuration
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic")  # Options: "anthropic", "openai", "databricks"
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-DATABRICKS_API_URL = os.getenv("DATABRICKS_API_URL", "")
-DATABRICKS_TOKEN = os.getenv("DATABRICKS_TOKEN", "")
-
-
-def extract_specifications_with_llm(text_content: str, llm_provider: Optional[str] = None) -> str:
-    """
-    Extract technical specifications from PDF text using an LLM.
-
-    Args:
-        text_content: Full text content from the PDF
-        llm_provider: LLM provider to use (anthropic, openai, databricks)
-
-    Returns:
-        Extracted specifications text or error message
-    """
-    if not text_content or len(text_content.strip()) < 10:
-        return "No text content available for specification extraction."
-
-    provider = llm_provider or LLM_PROVIDER
-
-    prompt = f"""Analyze the following technical document text and extract all technical specifications.
-
-Focus on extracting:
-- Materials and composition
-- Electrical properties (voltage, current, resistance, capacitance, etc.)
-- Physical dimensions and measurements
-- Performance characteristics
-- Operating conditions (temperature, pressure, etc.)
-- Standards and certifications
-- Part numbers and model information
-
-If no specifications are found, respond with "No technical specifications found in this document."
-
-Document text:
-{text_content[:10000]}
-
-Please provide a clear, organized summary of the technical specifications:"""
-
-    try:
-        if provider == "anthropic":
-            if not ANTHROPIC_API_KEY:
-                return "Error: ANTHROPIC_API_KEY not set. Please configure your API key."
-
-            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-            message = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=2048,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            return message.content[0].text
-
-        elif provider == "openai":
-            if not OPENAI_API_KEY:
-                return "Error: OPENAI_API_KEY not set. Please configure your API key."
-
-            client = openai.OpenAI(api_key=OPENAI_API_KEY)
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are a technical document analyzer specializing in extracting specifications."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=2048
-            )
-            return response.choices[0].message.content
-
-        elif provider == "databricks":
-            if not DATABRICKS_API_URL or not DATABRICKS_TOKEN:
-                return "Error: DATABRICKS_API_URL and DATABRICKS_TOKEN must be set for Databricks provider."
-
-            import requests
-            headers = {
-                "Authorization": f"Bearer {DATABRICKS_TOKEN}",
-                "Content-Type": "application/json"
-            }
-            data = {
-                "messages": [
-                    {"role": "system", "content": "You are a technical document analyzer specializing in extracting specifications."},
-                    {"role": "user", "content": prompt}
-                ],
-                "max_tokens": 2048
-            }
-
-            response = requests.post(DATABRICKS_API_URL, headers=headers, json=data)
-            response.raise_for_status()
-            result = response.json()
-            return result.get("choices", [{}])[0].get("message", {}).get("content", "No response from model")
-
-        else:
-            return f"Error: Unknown LLM provider '{provider}'. Supported: anthropic, openai, databricks"
-
-    except Exception as e:
-        return f"Error extracting specifications with {provider}: {str(e)}\n{traceback.format_exc()}"
-
-
-def extract_images_from_pdf(file_path: str, output_dir: Optional[str] = None):
-    """
-    Extract all images/diagrams from a PDF file.
-
-    Args:
-        file_path: Path to the PDF file
-        output_dir: Directory to save extracted images (optional)
-
-    Returns:
-        List of dictionaries containing image information
-    """
-    images = []
-
-    if output_dir is None:
-        output_dir = os.path.join(os.path.dirname(file_path), "extracted_images")
-
-    os.makedirs(output_dir, exist_ok=True)
-
-    try:
-        pdf_document = fitz.open(file_path)
-        base_filename = Path(file_path).stem
-
-        for page_num in range(len(pdf_document)):
-            page = pdf_document[page_num]
-            image_list = page.get_images(full=True)
-
-            for img_index, img_info in enumerate(image_list):
-                xref = img_info[0]
-
-                try:
-                    # Extract image
-                    base_image = pdf_document.extract_image(xref)
-                    image_bytes = base_image["image"]
-                    image_ext = base_image["ext"]
-
-                    # Create filename
-                    image_filename = f"{base_filename}_page{page_num + 1}_img{img_index + 1}.{image_ext}"
-                    image_path = os.path.join(output_dir, image_filename)
-
-                    # Save image
-                    with open(image_path, "wb") as img_file:
-                        img_file.write(image_bytes)
-
-                    # Get image dimensions
-                    try:
-                        pil_image = Image.open(io.BytesIO(image_bytes))
-                        width, height = pil_image.size
-                    except:
-                        width, height = 0, 0
-
-                    images.append({
-                        "filename": image_filename,
-                        "path": image_path,
-                        "page": page_num + 1,
-                        "index": img_index + 1,
-                        "format": image_ext,
-                        "width": width,
-                        "height": height,
-                        "size_bytes": len(image_bytes)
-                    })
-
-                except Exception as e:
-                    print(f"Error extracting image {img_index} from page {page_num}: {e}")
-                    continue
-
-        pdf_document.close()
-
-    except Exception as e:
-        print(f"Error processing PDF {file_path}: {e}")
-
-    return images
-
-
-def extract_pdf_info(file_path: str, llm_provider: Optional[str] = None):
-    """
-    Extract specifications and diagrams from a single PDF file.
-
-    Args:
-        file_path: Path to the PDF file
-        llm_provider: LLM provider to use for specification extraction
-
-    Returns:
-        Dictionary containing extracted information
-    """
-    result = {
-        "filename": os.path.basename(file_path),
-        "status": "success",
-        "specifications": "",
-        "diagrams": [],
-        "page_count": 0,
-        "error": None
-    }
-
-    try:
-        # Extract text content
-        pdf_document = fitz.open(file_path)
-        result["page_count"] = len(pdf_document)
-
-        text_parts = []
-        for page_num in range(len(pdf_document)):
-            page = pdf_document[page_num]
-            text = page.get_text()
-            if text:
-                text_parts.append(text)
-
-        full_text = "\n".join(text_parts)
-        pdf_document.close()
-
-        # Extract specifications using LLM
-        if full_text.strip():
-            result["specifications"] = extract_specifications_with_llm(full_text, llm_provider)
-        else:
-            result["specifications"] = "No text content found in PDF."
-
-        # Extract diagrams/images
-        result["diagrams"] = extract_images_from_pdf(file_path)
-
-    except Exception as e:
-        result["status"] = "error"
-        result["error"] = str(e)
-        result["traceback"] = traceback.format_exc()
-
-    return result
+from parser import TechnicalDrawingParser
 
 
 def process_pdfs_parallel(files, max_workers: int = 4, llm_provider: Optional[str] = None):
@@ -257,10 +25,13 @@ def process_pdfs_parallel(files, max_workers: int = 4, llm_provider: Optional[st
     results = []
     all_diagrams = []
 
+    # Initialize parser (technical drawing parser is the default)
+    parser = TechnicalDrawingParser(llm_provider=llm_provider)
+
     # Process files in parallel
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all tasks
-        future_to_file = {executor.submit(extract_pdf_info, file, llm_provider): file for file in files}
+        future_to_file = {executor.submit(parser.parse, file): file for file in files}
 
         # Collect results as they complete
         for future in as_completed(future_to_file):
@@ -325,6 +96,9 @@ def process_pdfs_parallel(files, max_workers: int = 4, llm_provider: Optional[st
 def create_interface():
     """Create the Gradio interface."""
 
+    # Get default LLM provider from environment
+    default_llm_provider = os.getenv("LLM_PROVIDER", "anthropic")
+
     with gr.Blocks(title="PDF Technical Specification & Diagram Extractor", theme=gr.themes.Soft()) as demo:
         gr.Markdown(
             """
@@ -351,7 +125,7 @@ def create_interface():
 
                 llm_provider = gr.Dropdown(
                     choices=["anthropic", "openai", "databricks"],
-                    value=LLM_PROVIDER,
+                    value=default_llm_provider,
                     label="LLM Provider",
                     info="Choose the AI model provider for specification extraction"
                 )
