@@ -21,7 +21,7 @@ DATABRICKS_API_URL = os.getenv("DATABRICKS_API_URL", "")
 DATABRICKS_TOKEN = os.getenv("DATABRICKS_TOKEN", "")
 
 
-def extract_specifications_with_llm(text_content: str, llm_provider: str = None) -> str:
+def extract_specifications_with_llm(text_content: str, llm_provider: Optional[str] = None) -> str:
     """
     Extract technical specifications from PDF text using an LLM.
 
@@ -114,7 +114,7 @@ Please provide a clear, organized summary of the technical specifications:"""
         return f"Error extracting specifications with {provider}: {str(e)}\n{traceback.format_exc()}"
 
 
-def extract_images_from_pdf(file_path: str, output_dir: str = None) -> List[dict]:
+def extract_images_from_pdf(file_path: str, output_dir: Optional[str] = None) -> List[dict]:
     """
     Extract all images/diagrams from a PDF file.
 
@@ -187,7 +187,7 @@ def extract_images_from_pdf(file_path: str, output_dir: str = None) -> List[dict
     return images
 
 
-def extract_pdf_info(file_path: str, llm_provider: str = None) -> dict:
+def extract_pdf_info(file_path: str, llm_provider: Optional[str] = None) -> dict:
     """
     Extract specifications and diagrams from a single PDF file.
 
@@ -239,7 +239,7 @@ def extract_pdf_info(file_path: str, llm_provider: str = None) -> dict:
     return result
 
 
-def process_pdfs_parallel(files: List[str], max_workers: int = 4, llm_provider: str = None) -> Tuple[str, str, List[str]]:
+def process_pdfs_parallel(files: List[str], max_workers: int = 4, llm_provider: Optional[str] = None) -> Tuple[str, str, List[str]]:
     """
     Process multiple PDF files in parallel.
 
