@@ -111,7 +111,7 @@ def create_interface():
 
     default_llm_provider = os.getenv("LLM_PROVIDER", "anthropic")
 
-    with gr.Blocks(title="PDF Technical Specification & Diagram Extractor", theme=gr.themes.Soft()) as demo:
+    with gr.Blocks(title="PDF Technical Specification & Diagram Extractor") as demo:
         gr.Markdown(
             """
             # 🔧 PDF Technical Specification & Diagram Extractor
@@ -160,8 +160,7 @@ def create_interface():
                 summary_output = gr.Textbox(
                     label="Extraction Summary",
                     lines=25,
-                    max_lines=40,
-                    show_copy_button=True
+                    max_lines=40
                 )
 
             with gr.Tab("🖼️  Extracted Diagrams"):
@@ -223,5 +222,6 @@ if __name__ == "__main__":
     demo.launch(
         server_name="0.0.0.0",
         server_port=7860,
-        share=False
+        share=False,
+        theme=gr.themes.Soft()
     )
