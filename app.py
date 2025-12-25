@@ -1,20 +1,19 @@
 import gradio as gr
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Optional
 import json
 import os
 
 from parser import TechnicalDrawingParser
 
 
-def process_pdfs_parallel(files, max_workers: int = 4, llm_provider: Optional[str] = None):
+def process_pdfs_parallel(files, max_workers=4, llm_provider=None):
     """
     Process multiple PDF files in parallel.
 
     Args:
         files: List of file paths
-        max_workers: Maximum number of parallel workers
-        llm_provider: LLM provider to use
+        max_workers: Number of parallel workers
+        llm_provider: LLM provider to use (anthropic/openai/databricks)
 
     Returns:
         Tuple of (summary_text, detailed_json, diagram_paths)

@@ -11,7 +11,6 @@ import fitz  # PyMuPDF
 import os
 import io
 import traceback
-from typing import Optional
 from PIL import Image
 from pathlib import Path
 import anthropic
@@ -21,7 +20,7 @@ import openai
 class TechnicalDrawingParser:
     """Parser for technical drawing PDFs."""
 
-    def __init__(self, llm_provider: Optional[str] = None):
+    def __init__(self, llm_provider=None):
         """
         Initialize the technical drawing parser.
 
@@ -34,7 +33,7 @@ class TechnicalDrawingParser:
         self.databricks_api_url = os.getenv("DATABRICKS_API_URL", "")
         self.databricks_token = os.getenv("DATABRICKS_TOKEN", "")
 
-    def extract_specifications_with_llm(self, text_content: str) -> str:
+    def extract_specifications_with_llm(self, text_content):
         """
         Extract technical specifications from PDF text using an LLM.
 
@@ -123,7 +122,7 @@ Please provide a clear, organized summary of the technical specifications:"""
         except Exception as e:
             return f"Error extracting specifications with {self.llm_provider}: {str(e)}\n{traceback.format_exc()}"
 
-    def extract_images_from_pdf(self, file_path: str, output_dir: Optional[str] = None):
+    def extract_images_from_pdf(self, file_path, output_dir=None):
         """
         Extract all images/diagrams from a PDF file.
 
@@ -195,7 +194,7 @@ Please provide a clear, organized summary of the technical specifications:"""
 
         return images
 
-    def parse(self, file_path: str):
+    def parse(self, file_path):
         """
         Parse a technical drawing PDF file.
 
@@ -203,7 +202,7 @@ Please provide a clear, organized summary of the technical specifications:"""
             file_path: Path to the PDF file
 
         Returns:
-            Dictionary containing parsed information
+            Dictionary with: filename, status, specifications, diagrams, page_count, error
         """
         result = {
             "filename": os.path.basename(file_path),
