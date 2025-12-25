@@ -67,7 +67,7 @@ Please provide a clear, organized summary of the technical specifications:"""
         try:
             # Use OpenAI client with Databricks endpoint
             client = openai.OpenAI(
-                base_url=f"{self.databricks_host}/serving-endpoints/{self.model_name}/invocations",
+                base_url=f"{self.databricks_host}/serving-endpoints/{self.model_name}",
                 api_key=self.databricks_token or "dummy-key"  # Token may not be needed in Databricks Apps
             )
 
