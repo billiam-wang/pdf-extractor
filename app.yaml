@@ -1,0 +1,11 @@
+# Databricks App Configuration
+# This file configures the app for deployment on Databricks
+
+command: ["python", "app.py"]
+
+env:
+  # Environment variables for the application
+  - name: GRADIO_SERVER_NAME
+    value: "0.0.0.0"
+  - name: GRADIO_SERVER_PORT
+    value: "7860"
