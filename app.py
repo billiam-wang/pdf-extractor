@@ -151,7 +151,11 @@ def run_extraction_pipeline(files, max_workers, llm_provider):
                         html_parts.append(f"<div>Missing file: {path}</div>")
                 html_parts.append('</ul></div>')
         else:
-            html_parts.append(f'<div style="color: #d32f2f;">❌ Error: {result.get("error", "Unknown error")}</div>')
+            error_msg = result.get("error", "Unknown error")
+            traceback_info = result.get("traceback", "")
+            html_parts.append(f'<div style="color: #d32f2f;">❌ Error: {error_msg}</div>')
+            if traceback_info:
+                html_parts.append(f'<pre style="background: #f5f5f5; padding: 12px; margin-top: 8px; border-radius: 4px; overflow-x: auto; font-size: 11px;">{traceback_info}</pre>')
 
         html_parts.append('</div></details>')
 
