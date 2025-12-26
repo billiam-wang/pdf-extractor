@@ -6,48 +6,21 @@ import json
 
 
 def extract_first_text_response(content):
-    """
-    Extract the first non-reasoning text response from LLM output.
+    if isinstance(content, list):
+        non_reasoning_items = [
+            item for item in content
+            if isinstance(item, dict) and item.get('type') != 'reasoning'
+        ]
 
-    Follows strict order:
-    1. Filter out reasoning types
-    2. Take first entry
-    3. Validate it's a text entry
-    4. Return only the text field
+        if non_reasoning_items:
+            first_entry = non_reasoning_items[0]
 
-    Args:
-        content: Raw LLM response content (string)
+            if first_entry.get('type') == 'text':
+                # Step 4: Return only the text field
+                return first_entry.get('text', '')
 
-    Returns:
-        Extracted text content or original content if parsing fails
-    """
-    try:
-        parsed = json.loads(content)
+    elif isinstance(content, dict):
+        if content.get('type') == 'text':
+            return content.get('text', content)
 
-        # Handle list of response items
-        if isinstance(parsed, list):
-            # Step 1: Filter out all reasoning type items
-            non_reasoning_items = [
-                item for item in parsed
-                if isinstance(item, dict) and item.get('type') != 'reasoning'
-            ]
-
-            # Step 2: Take the first entry (if exists)
-            if non_reasoning_items:
-                first_entry = non_reasoning_items[0]
-
-                # Step 3: Validate it's a text entry
-                if first_entry.get('type') == 'text':
-                    # Step 4: Return only the text field
-                    return first_entry.get('text', '')
-
-        # Handle single dict response (already filtered if not reasoning)
-        elif isinstance(parsed, dict):
-            if parsed.get('type') == 'text':
-                return parsed.get('text', content)
-
-        # If we couldn't parse structured format, return original
-        return content
-    except (json.JSONDecodeError, TypeError):
-        # Not JSON, return as-is
-        return content
+    return f"Error extracting content from: {content}"

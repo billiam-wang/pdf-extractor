@@ -1,13 +1,4 @@
-"""
-Technical Drawing Parser
-
-Specialized parser for technical drawings and specification documents.
-Extracts:
-- Technical specifications (materials, electrical properties, dimensions, etc.)
-- Diagrams and images
-"""
-
-import fitz  # PyMuPDF
+import fitz 
 import os
 import io
 import traceback
@@ -19,15 +10,8 @@ from .utils import extract_first_text_response
 
 
 class TechnicalDrawingParser:
-    """Parser for technical drawing PDFs."""
 
     def __init__(self, llm_provider=None):
-        """
-        Initialize the technical drawing parser.
-
-        Args:
-            llm_provider: LLM provider to use (databricks)
-        """
         self.llm_provider = llm_provider or os.getenv("LLM_PROVIDER", "databricks")
 
         # Databricks configuration
@@ -36,15 +20,6 @@ class TechnicalDrawingParser:
         self.model_name = "databricks-gpt-oss-120b"
 
     def extract_specifications_with_llm(self, text_content):
-        """
-        Extract technical specifications from PDF text using an LLM.
-
-        Args:
-            text_content: Full text content from the PDF
-
-        Returns:
-            Extracted specifications text or error message
-        """
         if not text_content or len(text_content.strip()) < 10:
             return "No text content available for specification extraction."
 
@@ -98,16 +73,6 @@ Please provide a clear, organized summary of the technical specifications in **M
             return f"Error extracting specifications: {str(e)}\n{traceback.format_exc()}"
 
     def extract_images_from_pdf(self, file_path, output_dir=None):
-        """
-        Extract all images/diagrams from a PDF file.
-
-        Args:
-            file_path: Path to the PDF file
-            output_dir: Directory to save extracted images (optional)
-
-        Returns:
-            List of dictionaries containing image information
-        """
         images = []
 
         if output_dir is None:
@@ -170,15 +135,6 @@ Please provide a clear, organized summary of the technical specifications in **M
         return images
 
     def parse(self, file_path):
-        """
-        Parse a technical drawing PDF file.
-
-        Args:
-            file_path: Path to the PDF file
-
-        Returns:
-            Dictionary with: filename, status, specifications, diagrams, page_count, error
-        """
         result = {
             "filename": os.path.basename(file_path),
             "status": "success",

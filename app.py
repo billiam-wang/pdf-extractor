@@ -7,17 +7,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def parse_single_pdf(file_path, llm_provider):
-    """Parse a single PDF file."""
     parser = TechnicalDrawingParser(llm_provider=llm_provider)
     return parser.parse(file_path)
 
 
 def run_extraction_pipeline(files, max_workers, llm_provider):
-    """
-    Complete extraction pipeline that returns only simple types.
-    All dict operations happen inside this function.
-    Returns: (html_output, paths_list)
-    """
     # Handle empty input
     if not files:
         return "<p>No files uploaded.</p>", []
