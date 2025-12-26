@@ -84,10 +84,10 @@ def run_extraction_pipeline(files, max_workers, llm_provider):
         ''')
 
         if status == "success":
-            # Show specifications
+            # Show specifications - always expect JSON
             specs = result.get("specifications", "No specifications found")
 
-            # Try to parse JSON response
+            # Parse JSON response
             try:
                 import json
                 if isinstance(specs, str):
@@ -96,36 +96,29 @@ def run_extraction_pipeline(files, max_workers, llm_provider):
                     spec_data = specs
 
                 # Build HTML for structured JSON display
-                html_parts.append('<div style="line-height: 1.6; color: #333;">')
+                html_parts.append('<div style="line-height: 1.8; color: #333;">')
 
-                # Display ID
-                if 'id' in spec_data:
-                    html_parts.append(f'<p><strong>ID:</strong> {spec_data.get("id", "N/A")}</p>')
+                # Generic display for all fields in the JSON
+                def render_value(value):
+                    """Render a value - simple types as text, complex as formatted JSON"""
+                    if isinstance(value, (dict, list)):
+                        # Complex type: render as formatted JSON code
+                        formatted_json = json.dumps(value, indent=2, ensure_ascii=False)
+                        return f'<pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto; margin: 4px 0;">{formatted_json}</pre>'
+                    elif value == "" or value is None:
+                        return '<span style="color: #999;">N/A</span>'
+                    else:
+                        # Simple type: render as text
+                        return str(value)
 
-                # Display specifications
-                if 'specifications' in spec_data:
-                    spec_details = spec_data['specifications']
-                    html_parts.append('<h4 style="margin-top: 16px; margin-bottom: 8px;">Specifications</h4>')
-
-                    # Electrical properties
-                    if 'electrical' in spec_details and spec_details['electrical']:
-                        html_parts.append('<p><strong>Electrical:</strong></p>')
-                        html_parts.append('<ul>')
-                        for item in spec_details['electrical']:
-                            html_parts.append(f'<li>{item}</li>')
-                        html_parts.append('</ul>')
-
-                    # Material properties
-                    if 'material' in spec_details and spec_details['material']:
-                        html_parts.append('<p><strong>Material:</strong></p>')
-                        html_parts.append('<ul>')
-                        for item in spec_details['material']:
-                            html_parts.append(f'<li>{item}</li>')
-                        html_parts.append('</ul>')
-
-                    # Operating temperature
-                    if 'operation_temperature' in spec_details and spec_details['operation_temperature']:
-                        html_parts.append(f'<p><strong>Operating Temperature:</strong> {spec_details["operation_temperature"]}</p>')
+                # Display each field with field name in bold
+                for field_name, field_value in spec_data.items():
+                    # Format field name (convert snake_case to Title Case)
+                    display_name = field_name.replace('_', ' ').title()
+                    html_parts.append(f'<div style="margin-bottom: 12px;">')
+                    html_parts.append(f'<strong>{display_name}:</strong> ')
+                    html_parts.append(render_value(field_value))
+                    html_parts.append('</div>')
 
                 html_parts.append('</div>')
 
