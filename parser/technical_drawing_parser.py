@@ -89,35 +89,36 @@ Please provide a clear, organized summary of the technical specifications in **M
 
             content = response.choices[0].message.content
 
-            # Parse response to extract only non-reasoning text
-            # Filter out reasoning blocks and return only the first text entry
+            # Parse response following strict order:
+            # 1. Filter out reasoning types
+            # 2. Take first entry
+            # 3. Validate it's a text entry
+            # 4. Return only the text field
             try:
                 import json
                 parsed = json.loads(content)
 
                 # Handle list of response items
                 if isinstance(parsed, list):
-                    # Filter out reasoning blocks, keep only non-reasoning items
+                    # Step 1: Filter out all reasoning type items
                     non_reasoning_items = [
                         item for item in parsed
                         if isinstance(item, dict) and item.get('type') != 'reasoning'
                     ]
 
-                    # Return the first non-reasoning text block
-                    for item in non_reasoning_items:
-                        if item.get('type') == 'text':
-                            return item.get('text', content)
+                    # Step 2: Take the first entry (if exists)
+                    if non_reasoning_items:
+                        first_entry = non_reasoning_items[0]
 
-                    # Fallback: if no text type found, return first item's text field
-                    if non_reasoning_items and 'text' in non_reasoning_items[0]:
-                        return non_reasoning_items[0]['text']
+                        # Step 3: Validate it's a text entry
+                        if first_entry.get('type') == 'text':
+                            # Step 4: Return only the text field
+                            return first_entry.get('text', '')
 
-                # Handle single dict response
+                # Handle single dict response (already filtered if not reasoning)
                 elif isinstance(parsed, dict):
                     if parsed.get('type') == 'text':
                         return parsed.get('text', content)
-                    elif parsed.get('type') != 'reasoning' and 'text' in parsed:
-                        return parsed['text']
 
                 # If we couldn't parse structured format, return original
                 return content
