@@ -1,9 +1,13 @@
 import gradio as gr
 import json
 import os
+from dotenv import load_dotenv
 
 from parser import TechnicalDrawingParser
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 def parse_single_pdf(file_path, llm_provider):
@@ -66,7 +70,13 @@ def run_extraction_pipeline(files, max_workers, llm_provider):
             lines.append(f"Diagrams extracted: {len(result.get('diagrams', []))}")
 
             lines.append("\n--- TECHNICAL SPECIFICATIONS ---")
-            lines.append(result.get("specifications", "No specifications found"))
+            specs = result.get("specifications", "No specifications found")
+            # Ensure specs is a string (handle lists or other types)
+            if isinstance(specs, list):
+                specs = "\n".join(str(s) for s in specs)
+            elif not isinstance(specs, str):
+                specs = str(specs)
+            lines.append(specs)
 
             diagrams = result.get("diagrams", [])
             if diagrams:
