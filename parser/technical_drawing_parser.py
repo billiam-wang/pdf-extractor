@@ -90,21 +90,34 @@ Please provide a clear, organized summary of the technical specifications in **M
             content = response.choices[0].message.content
 
             # Parse response to extract only non-reasoning text
-            # Handle structured responses that may contain reasoning blocks
+            # Filter out reasoning blocks and return only the first text entry
             try:
                 import json
                 parsed = json.loads(content)
 
-                # Extract first non-reasoning text block
-                if isinstance(parsed, dict):
+                # Handle list of response items
+                if isinstance(parsed, list):
+                    # Filter out reasoning blocks, keep only non-reasoning items
+                    non_reasoning_items = [
+                        item for item in parsed
+                        if isinstance(item, dict) and item.get('type') != 'reasoning'
+                    ]
+
+                    # Return the first non-reasoning text block
+                    for item in non_reasoning_items:
+                        if item.get('type') == 'text':
+                            return item.get('text', content)
+
+                    # Fallback: if no text type found, return first item's text field
+                    if non_reasoning_items and 'text' in non_reasoning_items[0]:
+                        return non_reasoning_items[0]['text']
+
+                # Handle single dict response
+                elif isinstance(parsed, dict):
                     if parsed.get('type') == 'text':
                         return parsed.get('text', content)
-                    elif 'text' in parsed:
+                    elif parsed.get('type') != 'reasoning' and 'text' in parsed:
                         return parsed['text']
-                elif isinstance(parsed, list):
-                    for item in parsed:
-                        if isinstance(item, dict) and item.get('type') == 'text':
-                            return item.get('text', content)
 
                 # If we couldn't parse structured format, return original
                 return content
