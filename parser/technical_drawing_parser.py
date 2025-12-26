@@ -15,7 +15,7 @@ class TechnicalDrawingParser:
         # Databricks configuration
         self.databricks_host = "https://dbc-101acd43-457b.cloud.databricks.com"
         self.databricks_token = os.getenv("DATABRICKS_TOKEN", "")
-        self.model_name = "databricks-gpt-oss-120b"
+        self.model_name = "billiamtesting-openai"
 
     def encode_file(self, file_path):
         """Encode file (image or PDF) to base64 string."""
@@ -88,32 +88,30 @@ Look for:
 
             response = client.responses.create(
                 model=self.model_name,
-                messages=[
+                input=[
                     {
                         "role": "user",
                         "content": [
                             {
-                                "type": "text",
+                                "type": "input_text",
                                 "text": prompt
                             },
                             {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:{media_type};base64,{base64_file}"
-                                }
+                                "type": "input_image",
+                                "image_url": f"data:{media_type};base64,{base64_file}"
                             }
                         ]
                     }
                 ],
-                response_format={
-                    "type": "json_schema",
-                    "json_schema": {
+                text={
+                    "format": {
+                        "type": "json_schema",
                         "name": "technical_specifications",
                         "schema": response_schema,
                         "strict": True
                     }
                 },
-                max_tokens=2048,
+                max_output_tokens=2048,
                 temperature=0.1
             )
 
