@@ -6,5 +6,6 @@ Each parser is specialized for a specific type of document.
 """
 
 from .technical_drawing_parser import TechnicalDrawingParser
+from . import utils
 
-__all__ = ['TechnicalDrawingParser']
+__all__ = ['TechnicalDrawingParser', 'utils']
