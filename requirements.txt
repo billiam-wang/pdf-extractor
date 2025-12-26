@@ -1,7 +1,5 @@
 gradio
-PyMuPDF
 Pillow
 openai
 requests
 markdown
-pytesseract
