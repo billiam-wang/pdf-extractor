@@ -98,12 +98,15 @@ Look for:
 
             if file_ext == '.pdf':
                 pil_img = self._render_pdf_page(file_path, 0, 200)
-                img_byte_arr = io.BytesIO()
-                pil_img.save(img_byte_arr, format='JPEG')
-                img_byte_arr.seek(0)
-                base64_file = __import__('base64').b64encode(img_byte_arr.getvalue()).decode('utf-8')
             else:
-                base64_file = encode_file_base64(file_path)
+                pil_img = Image.open(file_path)
+
+            pil_img = preprocess_drawing_image(pil_img)
+
+            img_byte_arr = io.BytesIO()
+            pil_img.save(img_byte_arr, format='JPEG')
+            img_byte_arr.seek(0)
+            base64_file = __import__('base64').b64encode(img_byte_arr.getvalue()).decode('utf-8')
 
             client = openai.OpenAI(
                 base_url=f"{self.databricks_host}/serving-endpoints",
@@ -227,6 +230,9 @@ FINAL CHECK BEFORE YOU RESPOND:
         out_dir = _ensure_output_dir()
 
         seg_np = self._load_input_image(file_path, dpi=self.SEG_DPI)
+        seg_pil = Image.fromarray(seg_np)
+        seg_pil = preprocess_drawing_image(seg_pil)
+        seg_np = np.array(seg_pil)
         ink = build_ink_no_border(seg_np)
 
         ink_pil = Image.fromarray(ink, "L").convert("RGB")
@@ -260,6 +266,7 @@ FINAL CHECK BEFORE YOU RESPOND:
         payload = json.loads(raw)
 
         hi_img = self._render_pdf_page(file_path, 0, self.EXPORT_DPI) if Path(file_path).suffix.lower() == '.pdf' else Image.open(file_path)
+        hi_img = preprocess_drawing_image(hi_img)
         hi_np = np.array(hi_img)
         ink_hi = build_ink_no_border(hi_np)
 
