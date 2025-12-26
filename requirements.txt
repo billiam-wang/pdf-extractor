@@ -3,3 +3,4 @@ PyMuPDF
 Pillow
 openai
 requests
+markdown

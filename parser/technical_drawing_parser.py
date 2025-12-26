@@ -62,7 +62,7 @@ If no specifications are found, respond with "No technical specifications found 
 Document text:
 {text_content[:10000]}
 
-Please provide a clear, organized summary of the technical specifications:"""
+Please provide a clear, organized summary of the technical specifications in **Markdown format** with a table structure for easy readability."""
 
         try:
             # Use OpenAI client with Databricks endpoint

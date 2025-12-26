@@ -1,5 +1,6 @@
 import gradio as gr
 import os
+import markdown
 
 from parser import TechnicalDrawingParser
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -46,7 +47,31 @@ def run_extraction_pipeline(files, max_workers, llm_provider):
 
     # Build HTML output with collapsible sections for each document
     html_parts = []
-    html_parts.append('<div style="font-family: system-ui, -apple-system, sans-serif;">')
+    html_parts.append('''
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 16px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f5f5f5;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+        tr:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+    <div style="font-family: system-ui, -apple-system, sans-serif;">
+    ''')
 
     for i, result in enumerate(results):
         filename = result.get('filename', 'unknown')
@@ -73,8 +98,11 @@ def run_extraction_pipeline(files, max_workers, llm_provider):
             elif not isinstance(specs, str):
                 specs = str(specs)
 
-            # Convert markdown tables and formatting to HTML-friendly format
-            specs_html = specs.replace('\n', '<br>')
+            # Convert markdown to HTML with table support
+            specs_html = markdown.markdown(
+                specs,
+                extensions=['tables', 'nl2br', 'fenced_code']
+            )
             html_parts.append(f'<div style="line-height: 1.6; color: #333;">{specs_html}</div>')
 
             # Show diagram info if any
