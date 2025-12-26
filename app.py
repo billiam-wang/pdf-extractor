@@ -86,18 +86,55 @@ def run_extraction_pipeline(files, max_workers, llm_provider):
         if status == "success":
             # Show specifications
             specs = result.get("specifications", "No specifications found")
-            # Ensure specs is a string
-            if isinstance(specs, list):
-                specs = "\n".join(str(s) for s in specs)
-            elif not isinstance(specs, str):
-                specs = str(specs)
 
-            # Convert markdown to HTML with table support
-            specs_html = markdown.markdown(
-                specs,
-                extensions=['tables', 'nl2br', 'fenced_code']
-            )
-            html_parts.append(f'<div style="line-height: 1.6; color: #333;">{specs_html}</div>')
+            # Try to parse JSON response
+            try:
+                import json
+                if isinstance(specs, str):
+                    spec_data = json.loads(specs)
+                else:
+                    spec_data = specs
+
+                # Build HTML for structured JSON display
+                html_parts.append('<div style="line-height: 1.6; color: #333;">')
+
+                # Display ID
+                if 'id' in spec_data:
+                    html_parts.append(f'<p><strong>ID:</strong> {spec_data.get("id", "N/A")}</p>')
+
+                # Display specifications
+                if 'specifications' in spec_data:
+                    spec_details = spec_data['specifications']
+                    html_parts.append('<h4 style="margin-top: 16px; margin-bottom: 8px;">Specifications</h4>')
+
+                    # Electrical properties
+                    if 'electrical' in spec_details and spec_details['electrical']:
+                        html_parts.append('<p><strong>Electrical:</strong></p>')
+                        html_parts.append('<ul>')
+                        for item in spec_details['electrical']:
+                            html_parts.append(f'<li>{item}</li>')
+                        html_parts.append('</ul>')
+
+                    # Material properties
+                    if 'material' in spec_details and spec_details['material']:
+                        html_parts.append('<p><strong>Material:</strong></p>')
+                        html_parts.append('<ul>')
+                        for item in spec_details['material']:
+                            html_parts.append(f'<li>{item}</li>')
+                        html_parts.append('</ul>')
+
+                    # Operating temperature
+                    if 'operation_temperature' in spec_details and spec_details['operation_temperature']:
+                        html_parts.append(f'<p><strong>Operating Temperature:</strong> {spec_details["operation_temperature"]}</p>')
+
+                html_parts.append('</div>')
+
+            except (json.JSONDecodeError, TypeError, KeyError) as e:
+                # Fallback: display as plain text
+                if isinstance(specs, str):
+                    html_parts.append(f'<div style="line-height: 1.6; color: #333;"><pre>{specs}</pre></div>')
+                else:
+                    html_parts.append(f'<div style="line-height: 1.6; color: #333;">{str(specs)}</div>')
 
             # Show diagram info if any
             diagrams = result.get("diagrams", [])

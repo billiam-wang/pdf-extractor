@@ -23,23 +23,28 @@ class TechnicalDrawingParser:
         if not text_content or len(text_content.strip()) < 10:
             return "No text content available for specification extraction."
 
-        prompt = f"""Analyze the following technical document text and extract all technical specifications.
+        prompt = f"""Analyze the following technical drawing document and extract specifications in JSON format.
 
-Focus on extracting:
-- Materials and composition
-- Electrical properties (voltage, current, resistance, capacitance, etc.)
-- Physical dimensions and measurements
-- Performance characteristics
-- Operating conditions (temperature, pressure, etc.)
-- Standards and certifications
-- Part numbers and model information
-
-If no specifications are found, respond with "No technical specifications found in this document."
+Look for:
+- ID number (usually to the left of "drawing no", may not be labeled)
+- Electrical properties (voltage, current, resistance, capacitance, ratings, etc.)
+- Materials (contact material, insulator material, plating, etc.)
+- Operating temperature range
 
 Document text:
 {text_content[:10000]}
 
-Please provide a clear, organized summary of the technical specifications in **Markdown format** with a table structure for easy readability."""
+Return ONLY a JSON object in this exact format:
+{{
+  "id": "the number to the left of drawing no (or empty string if not found)",
+  "specifications": {{
+    "electrical": ["list of electrical properties found"],
+    "material": ["list of materials and composition found"],
+    "operation_temperature": "temperature range if found, empty string otherwise"
+  }}
+}}
+
+Do not include any explanation, only return the JSON object."""
 
         try:
             # Use OpenAI client with Databricks endpoint
