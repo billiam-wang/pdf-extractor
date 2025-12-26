@@ -259,11 +259,29 @@ FINAL CHECK BEFORE YOU RESPOND:
                     {"type": "input_image", "image_url": image_data_url},
                 ],
             }],
+            text={
+                "format": {
+                    "type": "json_schema",
+                    "name": "diagram_extraction",
+                    "schema": response_schema,
+                    "strict": True
+                }
+            },
             max_output_tokens=2500,
+            temperature=0.1
         )
 
         raw = responses_text(response)
-        payload = json.loads(raw)
+
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as e:
+            print(f"Failed to parse JSON response. Raw response: {raw[:500]}")
+            raise ValueError(f"LLM returned invalid JSON: {e}")
+
+        if not isinstance(payload, dict) or "diagrams" not in payload:
+            print(f"Invalid payload structure. Payload: {payload}")
+            raise ValueError("LLM response missing 'diagrams' key")
 
         hi_img = self._render_pdf_page(file_path, 0, self.EXPORT_DPI) if Path(file_path).suffix.lower() == '.pdf' else Image.open(file_path)
         hi_img = preprocess_drawing_image(hi_img)
@@ -273,25 +291,34 @@ FINAL CHECK BEFORE YOU RESPOND:
         results: List[Dict[str, Any]] = []
 
         for d in payload.get("diagrams", []):
-            poly_mask = polygons_to_mask(
-                ink_hi.shape[0],
-                ink_hi.shape[1],
-                d["polygons"]
-            )
+            if not isinstance(d.get("polygons"), list):
+                print(f"Invalid polygon data for diagram {d.get('id')}: {d.get('polygons')}")
+                continue
 
-            refined = snap_mask_to_ink_connected(poly_mask, ink_hi, dilate_seed_px=10)
+            try:
+                poly_mask = polygons_to_mask(
+                    ink_hi.shape[0],
+                    ink_hi.shape[1],
+                    d["polygons"]
+                )
 
-            fname = f"{d['id']}_{uuid.uuid4().hex[:8]}.png"
-            img_path = str(Path(out_dir) / fname)
+                refined = snap_mask_to_ink_connected(poly_mask, ink_hi, dilate_seed_px=10)
 
-            export_cutout_white_bg(hi_np, refined, img_path)
+                fname = f"{d['id']}_{uuid.uuid4().hex[:8]}.png"
+                img_path = str(Path(out_dir) / fname)
 
-            results.append({
-                "filename": fname,
-                "page": 1,
-                "path": os.path.abspath(img_path),
-                "description": d['id'],
-            })
+                export_cutout_white_bg(hi_np, refined, img_path)
+
+                results.append({
+                    "filename": fname,
+                    "page": 1,
+                    "path": os.path.abspath(img_path),
+                    "description": d['id'],
+                })
+            except (ValueError, TypeError) as e:
+                print(f"Failed to process diagram {d.get('id')}: {e}")
+                print(f"Polygon data: {d.get('polygons')}")
+                continue
 
         return results
 
