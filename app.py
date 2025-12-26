@@ -1,6 +1,9 @@
 import gradio as gr
-import os
+import tempfile, os
 import markdown
+import base64
+import mimetypes
+from pathlib import Path
 
 from parser import TechnicalDrawingParser
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -9,6 +12,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 def parse_single_pdf(file_path, llm_provider):
     parser = TechnicalDrawingParser(llm_provider=llm_provider)
     return parser.parse(file_path)
+
+def img_path_to_data_url(path: str) -> str:
+    p = Path(path)
+    mime, _ = mimetypes.guess_type(p.name)
+    if mime is None:
+        mime = "image/png"  # fallback
+
+    data = p.read_bytes()
+    b64 = base64.b64encode(data).decode("ascii")
+    return f"data:{mime};base64,{b64}"
 
 
 def run_extraction_pipeline(files, max_workers, llm_provider):
@@ -136,11 +149,19 @@ def run_extraction_pipeline(files, max_workers, llm_provider):
                 html_parts.append('<strong>Extracted Diagrams:</strong>')
                 html_parts.append('<ul style="margin-top: 8px;">')
                 for diag in diagrams:
-                    html_parts.append(
-                        f'<li>{diag.get("filename", "unknown")} - '
-                        f'Page {diag.get("page", "?")}, '
-                        f'{diag.get("width", 0)}×{diag.get("height", 0)}px</li>'
-                    )
+                    path = diag.get("path")
+                    desc = diag.get("description", "")
+                    if path and os.path.exists(path):
+                        data_url = img_path_to_data_url(path)
+                        html_parts.append(
+                            f"<div style='margin:10px 0;'>"
+                            f"<div style='color:#666;font-size:12px'>{diag.get('description','')}</div>"
+                            f"<img src='{data_url}' "
+                            "style='max-width:100%; border:1px solid #eee; border-radius:8px;'/>"
+                            f"</div>"
+                        )
+                    else:
+                        html_parts.append(f"<div>Missing file: {path}</div>")
                 html_parts.append('</ul></div>')
         else:
             html_parts.append(f'<div style="color: #d32f2f;">❌ Error: {result.get("error", "Unknown error")}</div>')
@@ -194,7 +215,7 @@ def create_interface():
 
                 max_workers = gr.Slider(
                     minimum=1,
-                    maximum=10,
+                    maximum=20,
                     value=4,
                     step=1,
                     label="Parallel Workers"
@@ -208,7 +229,7 @@ def create_interface():
                     label="Extracted Specifications"
                 )
 
-            with gr.Tab("Diagrams"):
+            with gr.Tab("Gallery"):
                 diagram_gallery = gr.Gallery(
                     label="Extracted Diagrams",
                     show_label=True,
@@ -227,10 +248,13 @@ def create_interface():
     return demo
 
 
-if __name__ == "__main__":
+if __name__ == "__main__": 
+    tmp = tempfile.gettempdir() 
+    tmp_realpath = os.path.realpath(tmp)
     demo = create_interface()
     demo.launch(
         server_name="0.0.0.0",
         server_port=7860,
-        share=False
+        share=False,
+        allowed_paths=[tmp_realpath]
     )

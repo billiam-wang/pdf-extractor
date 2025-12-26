@@ -4,23 +4,28 @@ Utility functions for parsing LLM responses.
 
 import json
 
+def responses_text(response) -> str:
+    # If some wrapper returns a plain string
+    if isinstance(response, str):
+        return response
 
-def extract_first_text_response(content):
-    if isinstance(content, list):
-        non_reasoning_items = [
-            item for item in content
-            if isinstance(item, dict) and item.get('type') != 'reasoning'
-        ]
+    # Pydantic model -> dict
+    if hasattr(response, "model_dump"):
+        data = response.model_dump()
+    elif isinstance(response, dict):
+        data = response
+    else:
+        # last resort
+        data = getattr(response, "__dict__", {})
 
-        if non_reasoning_items:
-            first_entry = non_reasoning_items[0]
+    texts = []
+    for item in data.get("output", []) or []:
+        # Most common: {"type":"message","content":[{"type":"output_text","text":"..."}]}
+        for c in item.get("content", []) or []:
+            t = c.get("text")
+            if t:
+                texts.append(t)
 
-            if first_entry.get('type') == 'text':
-                # Step 4: Return only the text field
-                return first_entry.get('text', '')
+        # Sometimes text is nested differently; add more cases if needed.
 
-    elif isinstance(content, dict):
-        if content.get('type') == 'text':
-            return content.get('text', content)
-
-    return f"Error extracting content from: {content}"
+    return "\n".join(texts).strip()

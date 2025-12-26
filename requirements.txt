@@ -1,6 +1,6 @@
-gradio
-Pillow
-openai
-requests
-markdown
-pdf2image
+gradio==6.2.0
+Markdown==3.10
+numpy==2.4.0
+openai==2.14.0
+pdf2image==1.17.0
+Pillow==12.0.0
