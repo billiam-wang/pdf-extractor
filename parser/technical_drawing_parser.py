@@ -31,7 +31,7 @@ class TechnicalDrawingParser:
         # Databricks configuration
         self.databricks_host = "https://dbc-101acd43-457b.cloud.databricks.com"
         self.databricks_token = os.getenv("DATABRICKS_TOKEN", "")
-        self.model_name = "databricks-gpt-5-2"
+        self.model_name = "databricks-gpt-oss-120b"
 
     def extract_specifications_with_llm(self, text_content):
         """
@@ -67,7 +67,7 @@ Please provide a clear, organized summary of the technical specifications:"""
         try:
             # Use OpenAI client with Databricks endpoint
             client = openai.OpenAI(
-                base_url=f"{self.databricks_host}/serving-endpoints/{self.model_name}",
+                base_url=f"{self.databricks_host}/serving-endpoints",
                 api_key=self.databricks_token or "dummy-key"  # Token may not be needed in Databricks Apps
             )
 

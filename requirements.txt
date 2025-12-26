@@ -3,4 +3,3 @@ PyMuPDF
 Pillow
 openai
 requests
-python-dotenv

@@ -1,13 +1,11 @@
 import gradio as gr
 import json
 import os
-from dotenv import load_dotenv
 
 from parser import TechnicalDrawingParser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Load environment variables from .env file
-load_dotenv()
 
 
 def parse_single_pdf(file_path, llm_provider):
