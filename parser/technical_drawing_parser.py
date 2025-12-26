@@ -32,25 +32,45 @@ class TechnicalDrawingParser:
         Returns:
             JSON string with extracted specifications
         """
-        prompt = """Analyze this technical drawing document and extract specifications in JSON format.
+        prompt = """Analyze this technical drawing document and extract specifications.
 
 Look for:
 - ID number (usually to the left of "drawing no", may not be labeled)
 - Electrical properties (voltage, current, resistance, capacitance, ratings, etc.)
 - Materials (contact material, insulator material, plating, etc.)
-- Operating temperature range
+- Operating temperature range"""
 
-Return ONLY a JSON object in this exact format:
-{
-  "id": "the number to the left of drawing no (or empty string if not found)",
-  "specifications": {
-    "electrical": ["list of electrical properties found"],
-    "material": ["list of materials and composition found"],
-    "operation_temperature": "temperature range if found, empty string otherwise"
-  }
-}
-
-Do not include any explanation, only return the JSON object."""
+        # Define the response schema
+        response_schema = {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "description": "The number to the left of drawing no (or empty string if not found)"
+                },
+                "specifications": {
+                    "type": "object",
+                    "properties": {
+                        "electrical": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of electrical properties found"
+                        },
+                        "material": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of materials and composition found"
+                        },
+                        "operation_temperature": {
+                            "type": "string",
+                            "description": "Temperature range if found, empty string otherwise"
+                        }
+                    },
+                    "required": ["electrical", "material", "operation_temperature"]
+                }
+            },
+            "required": ["id", "specifications"]
+        }
 
         try:
             # Encode file to base64
@@ -66,7 +86,7 @@ Do not include any explanation, only return the JSON object."""
                 api_key=self.databricks_token or "dummy-key"
             )
 
-            response = client.chat.completions.create(
+            response = client.responses.create(
                 model=self.model_name,
                 messages=[
                     {
@@ -85,14 +105,24 @@ Do not include any explanation, only return the JSON object."""
                         ]
                     }
                 ],
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "technical_specifications",
+                        "schema": response_schema,
+                        "strict": True
+                    }
+                },
                 max_tokens=2048,
                 temperature=0.1
             )
 
+            # Parse response - Responses API returns structured data
+            import json
             content = response.choices[0].message.content
 
-            # Extract first non-reasoning text response using common utility
-            return extract_first_text_response(content)
+            # The content should already be valid JSON matching our schema
+            return content
 
         except Exception as e:
             return f"Error extracting specifications: {str(e)}\n{traceback.format_exc()}"
