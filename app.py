@@ -173,15 +173,15 @@ def process_files(files, max_workers, llm_provider):
 def create_interface():
     """Create the Gradio interface."""
 
-    with gr.Blocks(title="PDF Technical Specification & Diagram Extractor") as demo:
-        gr.Markdown("# PDF Technical Specification & Diagram Extractor")
+    with gr.Blocks(title="Document Parser and Extractor") as demo:
+        gr.Markdown("# Document Parser and Extractor")
 
         with gr.Row():
             with gr.Column(scale=1):
                 file_input = gr.File(
-                    label="Upload PDF Files",
+                    label="Upload Documents",
                     file_count="multiple",
-                    file_types=[".pdf"],
+                    file_types=[".pdf", ".png", ".jpg", ".jpeg"],
                     type="filepath"
                 )
 

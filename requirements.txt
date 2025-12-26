@@ -4,3 +4,4 @@ Pillow
 openai
 requests
 markdown
+pytesseract

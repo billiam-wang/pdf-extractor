@@ -1,10 +1,11 @@
-import fitz 
+import fitz
 import os
 import io
 import traceback
 from PIL import Image
 from pathlib import Path
 import openai
+import pytesseract
 
 from .utils import extract_first_text_response
 
@@ -76,6 +77,24 @@ Do not include any explanation, only return the JSON object."""
 
         except Exception as e:
             return f"Error extracting specifications: {str(e)}\n{traceback.format_exc()}"
+
+    def extract_text_from_image(self, file_path):
+        """
+        Extract text from an image file using OCR.
+
+        Args:
+            file_path: Path to the image file
+
+        Returns:
+            Extracted text content
+        """
+        try:
+            img = Image.open(file_path)
+            text = pytesseract.image_to_string(img)
+            return text
+        except Exception as e:
+            print(f"Error extracting text from image {file_path}: {e}")
+            return ""
 
     def extract_images_from_pdf(self, file_path, output_dir=None):
         images = []
@@ -150,28 +169,50 @@ Do not include any explanation, only return the JSON object."""
         }
 
         try:
-            # Extract text content
-            pdf_document = fitz.open(file_path)
-            result["page_count"] = len(pdf_document)
+            # Check file extension to determine file type
+            file_ext = Path(file_path).suffix.lower()
+            is_image = file_ext in ['.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.gif']
 
-            text_parts = []
-            for page_num in range(len(pdf_document)):
-                page = pdf_document[page_num]
-                text = page.get_text()
-                if text:
-                    text_parts.append(text)
+            if is_image:
+                # Handle image files with OCR
+                result["page_count"] = 1  # Images are single-page
 
-            full_text = "\n".join(text_parts)
-            pdf_document.close()
+                # Extract text using OCR
+                full_text = self.extract_text_from_image(file_path)
 
-            # Extract specifications using LLM
-            if full_text.strip():
-                result["specifications"] = self.extract_specifications_with_llm(full_text)
+                # Extract specifications using LLM
+                if full_text.strip():
+                    result["specifications"] = self.extract_specifications_with_llm(full_text)
+                else:
+                    result["specifications"] = "No text content found in image."
+
+                # For images, the file itself is the diagram (no need to extract)
+                # Optionally, we could copy the image to extracted_images directory
+                result["diagrams"] = []
+
             else:
-                result["specifications"] = "No text content found in PDF."
+                # Handle PDF files
+                pdf_document = fitz.open(file_path)
+                result["page_count"] = len(pdf_document)
 
-            # Extract diagrams/images
-            result["diagrams"] = self.extract_images_from_pdf(file_path)
+                text_parts = []
+                for page_num in range(len(pdf_document)):
+                    page = pdf_document[page_num]
+                    text = page.get_text()
+                    if text:
+                        text_parts.append(text)
+
+                full_text = "\n".join(text_parts)
+                pdf_document.close()
+
+                # Extract specifications using LLM
+                if full_text.strip():
+                    result["specifications"] = self.extract_specifications_with_llm(full_text)
+                else:
+                    result["specifications"] = "No text content found in PDF."
+
+                # Extract diagrams/images from PDF
+                result["diagrams"] = self.extract_images_from_pdf(file_path)
 
         except Exception as e:
             result["status"] = "error"
