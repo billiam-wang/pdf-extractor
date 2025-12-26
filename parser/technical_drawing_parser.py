@@ -87,7 +87,30 @@ Please provide a clear, organized summary of the technical specifications:"""
                 temperature=0.1
             )
 
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+
+            # Parse response to extract only non-reasoning text
+            # Handle structured responses that may contain reasoning blocks
+            try:
+                import json
+                parsed = json.loads(content)
+
+                # Extract first non-reasoning text block
+                if isinstance(parsed, dict):
+                    if parsed.get('type') == 'text':
+                        return parsed.get('text', content)
+                    elif 'text' in parsed:
+                        return parsed['text']
+                elif isinstance(parsed, list):
+                    for item in parsed:
+                        if isinstance(item, dict) and item.get('type') == 'text':
+                            return item.get('text', content)
+
+                # If we couldn't parse structured format, return original
+                return content
+            except (json.JSONDecodeError, TypeError):
+                # Not JSON, return as-is
+                return content
 
         except Exception as e:
             return f"Error extracting specifications: {str(e)}\n{traceback.format_exc()}"

@@ -15,11 +15,11 @@ def run_extraction_pipeline(files, max_workers, llm_provider):
     """
     Complete extraction pipeline that returns only simple types.
     All dict operations happen inside this function.
-    Returns: (specifications_text, paths_list)
+    Returns: (html_output, paths_list)
     """
     # Handle empty input
     if not files:
-        return "No files uploaded.", []
+        return "<p>No files uploaded.</p>", []
 
     # Process all files in parallel
     results = []
@@ -44,30 +44,59 @@ def run_extraction_pipeline(files, max_workers, llm_provider):
                     "page_count": 0
                 })
 
-    # Build clean, human-readable output
-    lines = []
+    # Build HTML output with collapsible sections for each document
+    html_parts = []
+    html_parts.append('<div style="font-family: system-ui, -apple-system, sans-serif;">')
 
-    for i, result in enumerate(results, 1):
-        if i > 1:
-            lines.append("\n" + "="*80 + "\n")
+    for i, result in enumerate(results):
+        filename = result.get('filename', 'unknown')
+        status = result.get('status', 'unknown')
 
-        lines.append(f"FILE: {result.get('filename', 'unknown')}")
+        # Create collapsible section for each document
+        html_parts.append(f'''
+        <details open style="margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; padding: 16px; background: #f9f9f9;">
+            <summary style="cursor: pointer; font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #333;">
+                📄 {filename}
+                <span style="font-size: 14px; font-weight: normal; color: #666; margin-left: 8px;">
+                    ({result.get('page_count', 0)} pages | {len(result.get('diagrams', []))} diagrams)
+                </span>
+            </summary>
+            <div style="margin-top: 12px; padding: 12px; background: white; border-radius: 4px;">
+        ''')
 
-        if result.get("status") == "success":
-            lines.append(f"Pages: {result.get('page_count', 0)} | Diagrams: {len(result.get('diagrams', []))}\n")
-
-            # Show the LLM extracted specifications
+        if status == "success":
+            # Show specifications
             specs = result.get("specifications", "No specifications found")
-            # Ensure specs is a string (handle lists or other types)
+            # Ensure specs is a string
             if isinstance(specs, list):
                 specs = "\n".join(str(s) for s in specs)
             elif not isinstance(specs, str):
                 specs = str(specs)
-            lines.append(specs)
-        else:
-            lines.append(f"\nError: {result.get('error', 'Unknown error')}")
 
-    specifications_text = "\n".join(lines)
+            # Convert markdown tables and formatting to HTML-friendly format
+            specs_html = specs.replace('\n', '<br>')
+            html_parts.append(f'<div style="line-height: 1.6; color: #333;">{specs_html}</div>')
+
+            # Show diagram info if any
+            diagrams = result.get("diagrams", [])
+            if diagrams:
+                html_parts.append('<div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee;">')
+                html_parts.append('<strong>Extracted Diagrams:</strong>')
+                html_parts.append('<ul style="margin-top: 8px;">')
+                for diag in diagrams:
+                    html_parts.append(
+                        f'<li>{diag.get("filename", "unknown")} - '
+                        f'Page {diag.get("page", "?")}, '
+                        f'{diag.get("width", 0)}×{diag.get("height", 0)}px</li>'
+                    )
+                html_parts.append('</ul></div>')
+        else:
+            html_parts.append(f'<div style="color: #d32f2f;">❌ Error: {result.get("error", "Unknown error")}</div>')
+
+        html_parts.append('</div></details>')
+
+    html_parts.append('</div>')
+    html_output = ''.join(html_parts)
 
     # Extract diagram paths
     paths = []
@@ -78,7 +107,7 @@ def run_extraction_pipeline(files, max_workers, llm_provider):
                 paths.append(path)
 
     # Return only simple types
-    return specifications_text, paths
+    return html_output, paths
 
 
 def process_files(files, max_workers, llm_provider):
@@ -123,10 +152,8 @@ def create_interface():
 
         with gr.Tabs():
             with gr.Tab("Specifications"):
-                summary_output = gr.Textbox(
-                    label="Extracted Specifications",
-                    lines=25,
-                    max_lines=40
+                summary_output = gr.HTML(
+                    label="Extracted Specifications"
                 )
 
             with gr.Tab("Diagrams"):
