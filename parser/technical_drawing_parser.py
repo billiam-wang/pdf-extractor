@@ -3,6 +3,9 @@ import traceback
 import base64
 from pathlib import Path
 import openai
+from pdf2image import convert_from_path
+from PIL import Image
+import io
 
 from .utils import extract_first_text_response
 
@@ -73,12 +76,26 @@ Look for:
         }
 
         try:
-            # Encode file to base64
-            base64_file = self.encode_file(file_path)
-
-            # Determine media type based on file extension
+            # Check if file is PDF and convert to image if needed
             file_ext = Path(file_path).suffix.lower()
-            media_type = "application/pdf" if file_ext == '.pdf' else "image/jpeg"
+
+            if file_ext == '.pdf':
+                # Convert PDF first page to image
+                images = convert_from_path(file_path, first_page=1, last_page=1, dpi=200)
+
+                if not images:
+                    return f"Error: Could not convert PDF to image"
+
+                # Convert PIL image to base64
+                img_byte_arr = io.BytesIO()
+                images[0].save(img_byte_arr, format='JPEG')
+                img_byte_arr.seek(0)
+                base64_file = base64.b64encode(img_byte_arr.read()).decode('utf-8')
+                media_type = "image/jpeg"
+            else:
+                # For images, encode directly
+                base64_file = self.encode_file(file_path)
+                media_type = "image/jpeg"
 
             # Use OpenAI client with Databricks endpoint
             client = openai.OpenAI(
