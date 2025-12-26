@@ -290,6 +290,15 @@ FINAL CHECK BEFORE YOU RESPOND:
 
         results: List[Dict[str, Any]] = []
 
+        full_img_path = str(Path(out_dir) / "00_original_preprocessed.png")
+        Image.fromarray(hi_np, "RGB").save(full_img_path)
+        results.append({
+            "filename": "00_original_preprocessed.png",
+            "page": 1,
+            "path": os.path.abspath(full_img_path),
+            "description": "Original (Preprocessed)",
+        })
+
         for d in payload.get("diagrams", []):
             if not isinstance(d.get("polygons"), list):
                 print(f"Invalid polygon data for diagram {d.get('id')}: {d.get('polygons')}")
