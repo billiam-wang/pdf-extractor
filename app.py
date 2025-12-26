@@ -1,31 +1,18 @@
 import gradio as gr
-import tempfile, os
-import markdown
-import base64
-import mimetypes
-from pathlib import Path
-
-from parser import TechnicalDrawingParser
+import tempfile
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from parsers import TechnicalDrawingParser
+from utils.file import img_path_to_data_url
 
 
 def parse_single_pdf(file_path, llm_provider):
     parser = TechnicalDrawingParser(llm_provider=llm_provider)
     return parser.parse(file_path)
 
-def img_path_to_data_url(path: str) -> str:
-    p = Path(path)
-    mime, _ = mimetypes.guess_type(p.name)
-    if mime is None:
-        mime = "image/png"  # fallback
-
-    data = p.read_bytes()
-    b64 = base64.b64encode(data).decode("ascii")
-    return f"data:{mime};base64,{b64}"
-
 
 def run_extraction_pipeline(files, max_workers, llm_provider):
-    # Handle empty input
     if not files:
         return "<p>No files uploaded.</p>", []
 
